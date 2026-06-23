@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "workoutx-sdk"
+version = "0.1.0"
+description = "Official Python SDK for the WorkoutX API — exercises, GIFs, workouts, supplements, and body scan."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "WorkoutX" }]
+keywords = ["workoutx", "fitness", "exercise", "exercisedb", "workout", "body-scan", "api", "sdk"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+dependencies = ["certifi"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://workoutxapp.com"
+Documentation = "https://workoutxapp.com/docs.html"
+Repository = "https://github.com/furkanuruk/workoutx-sdk-python"
+Issues = "https://github.com/furkanuruk/workoutx-sdk-python/issues"
+Changelog = "https://github.com/furkanuruk/workoutx-sdk-python/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/workoutx"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
