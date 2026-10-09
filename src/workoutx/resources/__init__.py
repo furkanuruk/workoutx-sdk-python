@@ -5,6 +5,7 @@ from .supplements import SupplementsResource
 from .scan import ScanResource
 from .auth import AuthResource
 from .billing import BillingResource
+from .v2 import V2Resource
 
 __all__ = [
     "ExercisesResource",
@@ -14,4 +15,5 @@ __all__ = [
     "ScanResource",
     "AuthResource",
     "BillingResource",
+    "V2Resource",
 ]

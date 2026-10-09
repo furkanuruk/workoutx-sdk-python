@@ -96,8 +96,10 @@ class HttpClient:
             except urllib.error.HTTPError as e:
                 status = e.code
                 if (status == 429 or status >= 500) and attempt < self._max_retries:
-                    time.sleep(self._retry_after(e) or _backoff(attempt))
-                    continue
+                    retry_after = self._retry_after(e)
+                    if self._is_retryable(e, retry_after):
+                        time.sleep(retry_after or _backoff(attempt))
+                        continue
                 raise self._to_error(e, path)
             except (urllib.error.URLError, TimeoutError, OSError) as e:
                 last_exc = e
@@ -126,6 +128,16 @@ class HttpClient:
             return json.loads(text)
         except json.JSONDecodeError:
             return text
+
+    @staticmethod
+    def _is_retryable(e: urllib.error.HTTPError, retry_after: Optional[float]) -> bool:
+        # A 429 is only worth retrying when it is a per-minute rate limit. An
+        # exhausted monthly quota (X-Quota-Exceeded: true) cannot succeed until
+        # the quota resets — or never, on Free — and its Retry-After can be
+        # weeks away, which we must not sleep through either.
+        if e.headers and e.headers.get("X-Quota-Exceeded") == "true":
+            return False
+        return retry_after is None or retry_after <= _MAX_RETRY_AFTER_S
 
     @staticmethod
     def _retry_after(e: urllib.error.HTTPError) -> Optional[float]:
@@ -165,6 +177,10 @@ class HttpClient:
             tip=parsed.get("tip"),
             docs=parsed.get("docs"),
         )
+
+
+# Longest server-requested wait we will sleep through before retrying.
+_MAX_RETRY_AFTER_S = 60.0
 
 
 def _backoff(attempt: int) -> float:

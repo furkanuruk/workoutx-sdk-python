@@ -1,6 +1,6 @@
 import pytest
 
-from workoutx import WorkoutX, WorkoutXConnectionError
+from workoutx import WorkoutX, WorkoutXConnectionError, WorkoutXError
 import workoutx._http as _http_mod
 
 
@@ -65,3 +65,35 @@ def test_custom_headers_merged(mock_http):
     wx.exercises.list()
     assert mock.last.headers["x-trace"] == "abc"
     assert "workoutx-sdk-python" in mock.last.headers["user-agent"]
+
+
+def test_no_retry_when_monthly_quota_exceeded(mock_http, monkeypatch):
+    slept = []
+    monkeypatch.setattr(_http_mod.time, "sleep", lambda s: slept.append(s))
+    mock = mock_http({
+        "status": 429,
+        "headers": {"X-Quota-Exceeded": "true", "Retry-After": "1209600"},
+        "json": {"error": "Monthly Quota Exceeded", "message": "out of quota"},
+    })
+    wx = WorkoutX(api_key="wx_test", max_retries=2)
+    with pytest.raises(WorkoutXError) as exc:
+        wx.exercises.list()
+    assert exc.value.status == 429
+    assert len(mock.calls) == 1
+    assert slept == []
+
+
+def test_rate_limit_429_is_still_retried(mock_http, monkeypatch):
+    monkeypatch.setattr(_http_mod.time, "sleep", lambda *_: None)
+    state = {"n": 0}
+
+    def reply(req):
+        state["n"] += 1
+        if state["n"] < 2:
+            return {"status": 429, "headers": {"Retry-After": "1"}, "json": {"error": "Rate Limit Exceeded"}}
+        return {"json": {"ok": True}}
+
+    mock_http(reply)
+    wx = WorkoutX(api_key="wx_test", max_retries=2)
+    assert wx.exercises.list() == {"ok": True}
+    assert state["n"] == 2

@@ -12,6 +12,7 @@ from .resources import (
     ScanResource,
     AuthResource,
     BillingResource,
+    V2Resource,
 )
 
 DEFAULT_BASE_URL = "https://api.workoutxapp.com"
@@ -71,6 +72,8 @@ class WorkoutX:
         # without re-supplying credentials.
         self.auth = AuthResource(self._http, self.set_scan_token)
         self.billing = BillingResource(self._http)
+        # API v2: new catalog with signed, expiring media links.
+        self.v2 = V2Resource(self._http)
 
     def gif_url(self, filename: str) -> str:
         """Build a direct GIF URL with the API key in the query string."""

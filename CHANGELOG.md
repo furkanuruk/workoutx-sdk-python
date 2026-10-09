@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. This project adheres
 to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- API v2 support (`v2`): the new exercise catalog (male and female models, 720p MP4 media at 30 fps), signed media links that expire, `freshMedia` to reuse or refresh links automatically, and `legacy` to map v1 exercise ids to v2. Not published until the v2 launch.
+
+## Unreleased
+
+### Fixed
+
+- A `429` for an exhausted monthly quota (`X-Quota-Exceeded: true`) is no
+  longer retried. It cannot succeed until the quota resets, so each retry was
+  one more rejected request counted against the account. Rate-limit `429`s are
+  still retried, but never after a `Retry-After` longer than 60 seconds.
+
 ## 0.1.0
 
 Initial release.
