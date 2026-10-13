@@ -5,7 +5,8 @@ media URLs, and call :meth:`V2Resource.fresh_media` when you display an exercise
 
 ``lang`` ("en", "tr", "de", "es", "fr", "zh-SG", "zh-HK") translates names,
 text, muscles and terms; filters always take the English values. Parameters
-keep the API's camelCase names (``weightKg``, ``bodyFocus``, ``daysPerWeek``).
+keep the API's camelCase names (``weightKg``, ``bodyFocus``, ``avoidJoints``,
+``daysPerWeek``).
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ _LIST_ALIASES = {
 }
 
 # Workout params that take several values: a list or tuple is sent comma-separated.
-_CSV_PARAMS = ("equipment", "bodyFocus", "exclude")
+_CSV_PARAMS = ("equipment", "bodyFocus", "avoidJoints", "exclude")
 
 
 def _expires_at(media: Dict[str, Any]) -> float:
@@ -105,7 +106,8 @@ class V2Resource:
         """Links you can use now: cached ones until 5 minutes before expiry, else new ones.
 
         Exercises received from list, get, media, similar, alternatives,
-        workout.generate and workout.program are cached."""
+        workout.generate (including warm-up and cool-down items) and
+        workout.program (its ``exerciseLibrary``) are cached."""
         cached = self._media.get(exercise_id)
         if cached and _expires_at(cached) - time.time() > _REFRESH_MARGIN_S:
             return cached
@@ -136,11 +138,13 @@ class V2Resource:
 
 
 class V2WorkoutResource:
-    """/v2/workout/*: the workout generator on v2 exercises.
+    """/v2/workout/*: sessions and multi-week programs built from movement patterns
+    on v2 exercises.
 
-    Every ``exercise`` in a result is a full v2 exercise with media links, kept for
-    :meth:`V2Resource.fresh_media`. ``equipment``, ``bodyFocus`` and ``exclude``
-    take a comma-separated string or a list.
+    The media links of every full exercise in a result (session exercises, warm-up
+    and cool-down items, a program's ``exerciseLibrary``) are kept for
+    :meth:`V2Resource.fresh_media`. ``equipment``, ``bodyFocus``, ``avoidJoints`` and
+    ``exclude`` take a comma-separated string or a list.
     """
 
     def __init__(self, http: HttpClient, remember: Callable[[Any], None]) -> None:
@@ -148,28 +152,55 @@ class V2WorkoutResource:
         self._remember = remember
 
     def generate(self, **params: Any) -> Dict[str, Any]:
-        """Generate a single workout (plan-gated: Growth, Scale, legacy Pro and Ultra).
+        """Generate one session (plan-gated: Growth, Scale, legacy Pro and Ultra).
 
-        Params: goal (muscle_gain, strength, fat_loss, endurance, mobility), duration
-        (20-120), level (beginner, intermediate, advanced), equipment, split, bodyFocus,
-        exclude (v2 ids), seed, model ("male"/"female"), lang.
+        Params: goal (muscle_gain, strength, fat_loss, endurance, mobility,
+        general_fitness), duration (15-120 minutes), level (beginner, intermediate,
+        advanced), equipment (names, or a preset: "gym", "home", "bodyweight"), split
+        (full_body, full_body_b, full_body_c, upper, upper_b, lower, lower_b, push,
+        push_b, pull, pull_b, legs, legs_b, core, conditioning, mobility; v1's
+        push_pull_legs and upper_lower still work), bodyFocus (overrides split),
+        avoidJoints (knee, shoulder, lumbar_spine, elbow, wrist, hip, ankle), format
+        (auto, straight, superset, circuit), exclude (v2 ids), seed, model
+        ("male"/"female"), lang.
+
+        Returns ``{goal, level, model, seed, split, format, targetDurationMinutes,
+        estimatedDurationMinutes, equipment, avoidJoints?, circuit?, summary, warmup,
+        exercises, cooldown, notes?}``. ``warmup`` is ``{minutes, rampUp?, items}`` and
+        ``cooldown`` ``{minutes, items}``; each item is ``{durationSeconds, perSide,
+        note, exercise}``. Each of ``exercises`` is ``{order, block, role, pattern,
+        sets, rounds?, reps? | durationSeconds?, perSide, restSeconds, rir?, tempo?,
+        load?, cue, rationale, note?, alternatives, exercise}``: blocks "C1"/"C2" are
+        a superset, ``alternatives`` are light (``{id, name, equipment, model}``, no
+        media). Every ``exercise`` is a full v2 exercise with media.
         """
         workout = self._http.request("/v2/workout/generate", query=_csv(params))
-        for item in workout.get("exercises", []):
+        for item in workout.get("exercises") or []:
             self._remember(item.get("exercise"))
+        for part in ("warmup", "cooldown"):
+            for item in (workout.get(part) or {}).get("items") or []:
+                self._remember(item.get("exercise"))
         return workout
 
     def program(self, **params: Any) -> Dict[str, Any]:
         """Generate a multi-week program (plan-gated: Scale, legacy Ultra).
 
-        Params: goal, level, weeks (2-12), daysPerWeek (2-6), duration, equipment,
-        model ("male"/"female"), lang.
+        Params: goal, level, weeks (2-16), daysPerWeek (2-6), duration (20-120 minutes
+        per session), equipment, avoidJoints, format, seed, model ("male"/"female"),
+        lang. Programs take no split, bodyFocus or exclude.
+
+        Returns ``{goal, level, model, seed, weeks, daysPerWeek, sessionDurationMinutes,
+        equipment, avoidJoints?, schedule, progressionModel, blocks, weeklyVolume,
+        sessions, program, exerciseLibrary}``. ``sessions`` are the session templates
+        (warm-up, cool-down and exercises with pattern, cue, rationale, alternatives);
+        ``program`` is the weeks (``{week, block, phase, deload, guidance, days}``) with
+        each day's prescriptions. Exercises in both are light references by
+        ``exerciseId``; ``exerciseLibrary`` has each one once as a full v2 exercise
+        with media.
         """
         program = self._http.request("/v2/workout/program", query=_csv(params))
-        for week in program.get("program", []):
-            for day in week.get("days", []):
-                for item in day.get("exercises", []):
-                    self._remember(item.get("exercise"))
+        for exercise in program.get("exerciseLibrary") or []:
+            self._remember(exercise)
         return program
 
 
