@@ -6,6 +6,7 @@ to [Semantic Versioning](https://semver.org/).
 ## Unreleased
 
 - API v2 support (`v2`): the new exercise catalog (male and female models, 720p MP4 media at 30 fps), signed media links that expire, `freshMedia` to reuse or refresh links automatically, and `legacy` to map v1 exercise ids to v2. Not published until the v2 launch.
+- API v2 smart, workout and supplement methods: `v2.similar`, `v2.alternatives` and `v2.calories`; `v2.workout.generate` and `v2.workout.program`; `v2.supplements` (`list`, `filters`, `get`, `for_exercise`, `stack`) on v2 exercise ids. Exercises in similar, alternatives and workout results fill the media cache, so `fresh_media` reuses their links. Lists for `equipment`, `bodyFocus` and `exclude` are sent comma-separated. `lang` (`en`, `tr`, `de`, `es`, `fr`, `zh-SG`, `zh-HK`) on `list`, `get`, `legacy` and the new methods, and the Joint & Rehab filters (`jointFocus`, `intensityLevel`, `movementTag`) on `list`.
 
 ## Unreleased
 

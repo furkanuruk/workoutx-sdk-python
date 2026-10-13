@@ -85,6 +85,59 @@ WorkoutX(api_key=key, scan_email="u@x.com", scan_password="•")   # auto-login
 ex = wx.exercises.find("lunges")   # dict | None
 ```
 
+## API v2
+
+`wx.v2` is the new exercise catalog: 1,900+ movements as 2,700+ clips (male and
+female models are separate exercises, linked by `counterpartId`), with 720p MP4
+media at 30 fps. The API key is always sent in the `X-WorkoutX-Key` header.
+
+Media links are signed and expire after about 24 hours: store exercise ids,
+never media URLs, and call `fresh_media(id)` when you display an exercise. It
+reuses the links of every exercise the SDK has already received (from `list`,
+`get`, `similar`, `alternatives`, `workout.generate` and `workout.program`)
+until they are close to expiry, and only then makes a request. Parameters keep
+the API's camelCase names (`weightKg`, `bodyFocus`, `daysPerWeek`).
+
+```python
+# Catalog. lang: en, tr, de, es, fr, zh-SG, zh-HK (filters stay English)
+page    = wx.v2.list(body_part="chest", model="female", lang="de")
+bench   = wx.v2.get("ex_SAWOOH", lang="tr")    # Barbell Bench Press
+from_v1 = wx.v2.legacy("0025")                 # v1 id -> v2 exercise
+
+# Similar exercises, alternatives and calories
+similar = wx.v2.similar("ex_SAWOOH", limit=5)  # {exerciseId, model, total, limit, offset, results}
+for ex in similar["results"]:
+    print(ex["name"], ex["score"])             # full v2 exercises, best first
+alts = wx.v2.alternatives("ex_SAWOOH", equipment="dumbbell", model="any")
+kcal = wx.v2.calories("ex_SAWOOH", weightKg=80, minutes=20)   # kcal["totalKcal"]
+
+# Workout generator and multi-week programs (lists are sent comma-separated)
+workout = wx.v2.workout.generate(
+    goal="muscle_gain", duration=45, equipment=["barbell", "dumbbell"],
+    bodyFocus=["chest", "back"], exclude=["ex_WOZL6H"], model="female",
+)
+program = wx.v2.workout.program(goal="strength", weeks=8, daysPerWeek=4)
+
+for item in workout["exercises"]:
+    links = wx.v2.fresh_media(item["exercise"]["id"])  # no request: cached from generate()
+    print(item["exercise"]["name"], item["sets"], item["reps"], links and links["mp4"])
+
+# Supplements (take v2 exercise ids)
+supps = wx.v2.supplements.list(goal="strength", evidence="strong")
+picks = wx.v2.supplements.for_exercise("ex_SAWOOH", limit=3)
+stack = wx.v2.supplements.stack(goal="muscle_gain", level="essential")
+```
+
+| Feature | Plans |
+|---------|-------|
+| `similar`, `alternatives`, `calories` | all plans |
+| Joint & Rehab filters on `list` (`jointFocus`, `intensityLevel`, `movementTag`) | Growth, Scale (legacy Ultra) |
+| `workout.generate`, `supplements.*` except `stack` | Growth, Scale (legacy Pro, Ultra) |
+| `workout.program`, `supplements.stack` | Scale (legacy Ultra) |
+
+On a plan without the feature, the call raises `WorkoutXError` with status
+`403`; `e.body["requiredPlan"]` names the cheapest plan that has it.
+
 ## Error handling
 
 ```python
@@ -106,7 +159,7 @@ honoring `Retry-After`.
 
 ```bash
 pip install -e ".[test]"
-pytest          # 25 offline unit tests (no network)
+pytest          # 44 offline unit tests (no network)
 ```
 
 ## About WorkoutX
