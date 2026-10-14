@@ -16,7 +16,7 @@ from .resources import (
 )
 
 DEFAULT_BASE_URL = "https://api.workoutxapp.com"
-_VERSION = "0.1.0"
+_VERSION = "0.2.0"
 
 
 class WorkoutX:

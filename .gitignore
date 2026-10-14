@@ -8,3 +8,8 @@ build/
 venv/
 .DS_Store
 .pypirc
+
+# Stray npm files from an unrelated local install (not part of the SDK)
+node_modules/
+/package.json
+/package-lock.json
